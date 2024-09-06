@@ -1,0 +1,74 @@
+[package]
+name = "report_types"
+version = "0.0.1"
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+license = { workspace = true }
+
+[lints]
+workspace = true
+
+
+[dependencies]
+cache-key = { workspace = true }
+distribution-types = { workspace = true }
+install-wheel-rs = { workspace = true, default-features = false }
+pep440_rs = { workspace = true }
+pep508_rs = { workspace = true }
+platform-tags = { workspace = true }
+pypi-types = { workspace = true }
+uv-auth = { workspace = true }
+uv-cache = { workspace = true }
+uv-cli = { workspace = true }
+uv-client = { workspace = true }
+uv-configuration = { workspace = true }
+uv-dispatch = { workspace = true }
+uv-distribution = { workspace = true }
+uv-fs = { workspace = true }
+uv-git = { workspace = true }
+uv-installer = { workspace = true }
+uv-normalize = { workspace = true }
+uv-python = { workspace = true, features = ["schemars"]}
+uv-requirements = { workspace = true }
+uv-resolver = { workspace = true }
+uv-scripts = { workspace = true }
+uv-settings = { workspace = true, features = ["schemars"] }
+uv-shell = { workspace = true }
+uv-tool = { workspace = true }
+uv-types = { workspace = true }
+uv-virtualenv = { workspace = true }
+uv-workspace = { workspace = true }
+
+anstream = { workspace = true }
+anyhow = { workspace = true }
+axoupdater = { workspace = true, features = ["github_releases", "tokio"], optional = true }
+clap = { workspace = true, features = ["derive", "string", "wrap_help"] }
+flate2 = { workspace = true, default-features = false }
+fs-err = { workspace = true, features = ["tokio"] }
+futures = { workspace = true }
+indexmap = { workspace = true }
+indicatif = { workspace = true }
+indoc = { workspace = true }
+itertools = { workspace = true }
+jiff = { workspace = true }
+miette = { workspace = true, features = ["fancy"] }
+rayon = { workspace = true }
+regex = { workspace = true }
+rustc-hash = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+textwrap = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+toml = { workspace = true }
+tracing = { workspace = true }
+tracing-durations-export = { workspace = true, features = ["plot"], optional = true }
+tracing-subscriber = { workspace = true, features = ["json"] }
+tracing-tree = { workspace = true }
+unicode-width = { workspace = true }
+url = { workspace = true }
+which = { workspace = true }
