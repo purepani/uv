@@ -19,69 +19,6 @@ use uv_normalize::{ExtraName, InvalidNameError, PackageName};
 use crate::lenient_requirement::LenientRequirement;
 use crate::{LenientVersionSpecifiers, VerbatimParsedUrl};
 
-pub struct MetadataVersion {
-    major: u8,
-    minor: u8,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "kebab-case", untagged)]
-pub enum Metadata {
-    Metadata10(Metadata10),
-    Metadata12(Metadata12),
-    Metadata23(Metadata23),
-}
-
-impl Metadata {
-    pub fn parse_metadata(content: &[u8]) -> Result<Self, MetadataError> {
-        let metadata_version = headers
-            .get_first_value("Metadata-Version")
-            .ok_or(MetadataError::FieldNotFound("Metadata-Version"))?;
-
-        // Parse the version into (major, minor).
-        let (major, minor) = parse_version(&metadata_version)?;
-        match (major, minor) {
-            (x, y) if (x, y) >= (3, 0) => {
-                Err(MetadataError::UnsupportedMetadataVersion(metadata_version))
-            }
-            (x, y) if (x, y) >= (2, 2) => {
-                Ok(Metadata::Metadata23(Metadata23::parse_metadata(content)))
-            }
-            (x, y) if (x, y) >= (1, 2) => {
-                Ok(Metadata::Metadata12(Metadata12::parse_metadata(content)))
-            }
-            (x, y) if (x, y) >= (1, 0) => {
-                Ok(Metadata::Metadata10(Metadata10::parse_metadata(content)))
-            }
-            (_, _) => Err(MetadataError::UnsupportedMetadataVersion(metadata_version)),
-        }
-    }
-
-    pub fn parse_pkg_info(content: &[u8]) -> Result<Self, MetadataError> {
-        let metadata_version = headers
-            .get_first_value("Metadata-Version")
-            .ok_or(MetadataError::FieldNotFound("Metadata-Version"))?;
-
-        // Parse the version into (major, minor).
-        let (major, minor) = parse_version(&metadata_version)?;
-        match (major, minor) {
-            (x, y) if (x, y) >= (3, 0) => {
-                Err(MetadataError::UnsupportedMetadataVersion(metadata_version))
-            }
-            (x, y) if (x, y) >= (2, 2) => {
-                Ok(Metadata::Metadata23(Metadata23::parse_pkg_info(content)))
-            }
-            (x, y) if (x, y) >= (1, 2) => {
-                Ok(Metadata::Metadata12(Metadata12::parse_pkg_info(content)))
-            }
-            (x, y) if (x, y) >= (1, 0) => {
-                Ok(Metadata::Metadata10(Metadata10::parse_pkg_info(content)))
-            }
-            (_, _) => Err(MetadataError::UnsupportedMetadataVersion(metadata_version)),
-        }
-    }
-}
-
 /// Python Package Metadata 2.3 as specified in
 /// <https://packaging.python.org/specifications/core-metadata/>.
 ///
@@ -472,56 +409,6 @@ impl Metadata12 {
                 .ok_or(MetadataError::FieldNotFound("Version"))?,
         )
         .map_err(MetadataError::Pep440VersionError)?;
-        let requires_python = headers
-            .get_first_value("Requires-Python")
-            .map(|requires_python| LenientVersionSpecifiers::from_str(&requires_python))
-            .transpose()?
-            .map(VersionSpecifiers::from);
-
-        Ok(Self {
-            name,
-            version,
-            requires_python,
-        })
-    }
-
-    pub fn parse_pkg_info(content: &[u8]) -> Result<Self, MetadataError> {
-        let headers = Headers::parse(content)?;
-
-        // To rely on a source distribution's `PKG-INFO` file, the `Metadata-Version` field must be
-        // present and set to a value of at least `1.2`.
-        let metadata_version = headers
-            .get_first_value("Metadata-Version")
-            .ok_or(MetadataError::FieldNotFound("Metadata-Version"))?;
-
-        // Parse the version into (major, minor).
-        let (major, minor) = parse_version(&metadata_version)?;
-        if (major, minor) < (1, 1) || (major, minor) >= (2, 0) {
-            return Err(MetadataError::UnsupportedMetadataVersion(metadata_version));
-        }
-
-        // If any of the fields we need are marked as dynamic, we can't use the `PKG-INFO` file.
-        let dynamic = headers.get_all_values("Dynamic").collect::<Vec<_>>();
-        for field in dynamic {
-            match field.as_str() {
-                "Requires-Python" => return Err(MetadataError::DynamicField("Requires-Python")),
-                _ => (),
-            }
-        }
-
-        // The `Name` and `Version` fields are required, and can't be dynamic.
-        let name = PackageName::new(
-            headers
-                .get_first_value("Name")
-                .ok_or(MetadataError::FieldNotFound("Name"))?,
-        )?;
-        let version = Version::from_str(
-            &headers
-                .get_first_value("Version")
-                .ok_or(MetadataError::FieldNotFound("Version"))?,
-        )
-        .map_err(MetadataError::Pep440VersionError)?;
-
         let requires_python = headers
             .get_first_value("Requires-Python")
             .map(|requires_python| LenientVersionSpecifiers::from_str(&requires_python))

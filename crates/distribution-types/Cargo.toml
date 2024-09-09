@@ -23,6 +23,7 @@ uv-cache-info = { workspace = true }
 uv-fs = { workspace = true }
 uv-git = { workspace = true }
 uv-normalize = { workspace = true }
+install-wheel-rs = {workspace = true}
 
 anyhow = { workspace = true }
 fs-err = { workspace = true }

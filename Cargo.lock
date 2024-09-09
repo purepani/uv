@@ -1011,6 +1011,7 @@ dependencies = [
  "cache-key",
  "distribution-filename",
  "fs-err",
+ "install-wheel-rs",
  "itertools 0.13.0",
  "jiff",
  "pep440_rs",
@@ -3039,7 +3040,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "report_types"
+name = "report-types"
 version = "0.0.1"
 dependencies = [
  "anstream",
@@ -4543,6 +4544,7 @@ dependencies = [
  "pypi-types",
  "rayon",
  "regex",
+ "report-types",
  "reqwest",
  "rustc-hash",
  "same-file",

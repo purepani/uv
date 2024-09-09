@@ -1,10 +1,12 @@
+use anyhow::{anyhow, Context, Result};
+use install_wheel_rs::metadata::{find_flat_dist_info, read_dist_info_metadata};
+use std::fs;
 use std::path::{Path, PathBuf};
-
-use anyhow::{anyhow, Result};
+use uv_fs::Simplified;
 
 use distribution_filename::WheelFilename;
 use pep508_rs::VerbatimUrl;
-use pypi_types::{HashDigest, ParsedDirectoryUrl};
+use pypi_types::{HashDigest, ParsedDirectoryUrl, Yanked};
 use uv_cache_info::CacheInfo;
 use uv_normalize::PackageName;
 
@@ -166,6 +168,27 @@ impl CachedDist {
             Self::Registry(dist) => &dist.filename,
             Self::Url(dist) => &dist.filename,
         }
+    }
+
+    pub fn metadata(&self) -> Result<pypi_types::Metadata23> {
+        let prefix = find_flat_dist_info(self.filename(), self.path());
+        let contents = prefix.and_then(|prefix| read_dist_info_metadata(&prefix, self.path()));
+
+        // TODO(zanieb): Update this to use thiserror so we can unpack parse errors downstream
+        pypi_types::Metadata23::parse_metadata(&contents.expect("test")).with_context(|| {
+            format!(
+                "Failed to parse `METADATA` file at: {}",
+                self.path().user_display()
+            )
+        })
+    }
+
+    pub fn yanked(&self) -> Option<&Yanked> {
+        //match self {
+        //Self::Registry(dist) => false,
+        //Self::Url(_) => None,
+        //}
+        Some(&Yanked::Bool(false))
     }
 }
 

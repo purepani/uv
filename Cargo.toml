@@ -26,6 +26,7 @@ pep440_rs = { path = "crates/pep440-rs" }
 pep508_rs = { path = "crates/pep508-rs", features = ["non-pep508-extensions"] }
 platform-tags = { path = "crates/platform-tags" }
 pypi-types = { path = "crates/pypi-types" }
+report-types = { path = "crates/report-types" }
 requirements-txt = { path = "crates/requirements-txt" }
 uv-auth = { path = "crates/uv-auth" }
 uv-build = { path = "crates/uv-build" }

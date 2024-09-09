@@ -3,6 +3,7 @@
 use anyhow::{anyhow, Context};
 use itertools::Itertools;
 use owo_colors::OwoColorize;
+use report_types::PipReport;
 use std::collections::{BTreeSet, HashSet};
 use std::fmt::Write;
 use std::path::PathBuf;
@@ -543,6 +544,11 @@ pub(crate) async fn install(
 
     if compile {
         compile_bytecode(venv, cache, printer).await?;
+    }
+
+    let report = PipReport::from_resolution(&installs, &requirements);
+    if let Ok(rep) = report.to_json_pretty() {
+        println!("{}", rep)
     }
 
     // Construct a summary of the changes made to the environment.
