@@ -4,7 +4,7 @@ use distribution_types::{
 };
 use pep440_rs::Version;
 use pep508_rs::MarkerEnvironment;
-use pypi_types::{DirectUrl, HashDigest, Metadata23, ParsedUrl, Requirement, RequirementSource};
+use pypi_types::{DirectUrl, HashDigest, Metadata, ParsedUrl, Requirement, RequirementSource};
 use serde::{Deserialize, Serialize};
 use url::Url;
 use uv_normalize::{ExtraName, PackageName};
@@ -21,7 +21,7 @@ pub struct PipReport {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct InstallationReportItem {
-    pub metadata: Metadata23,
+    pub metadata: Metadata,
     pub is_direct: bool,
     pub is_yanked: bool,
     pub download_info: Option<DirectUrl>,
@@ -50,7 +50,7 @@ impl PipReport {
                         },
                         is_yanked: false,
                         download_info: match requirement {
-                            Some(req) => _,
+                            Some(req) => None,
                             None => None,
                         },
                         requested: match requirement {
