@@ -23,7 +23,8 @@ use crate::{LenientVersionSpecifiers, VerbatimParsedUrl};
 /// Taken from <https://github.com/PyO3/python-pkginfo-rs/blob/5609785355afed3ff6c63b14331e729d0f929b8b/src/metadata.rs>
 ///
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
 pub struct Metadata {
     /// Version of the file format; legal values are `1.0`, `1.1`, `1.2`, `2.1` and `2.2`.
     pub metadata_version: String,
@@ -122,7 +123,7 @@ pub struct Metadata {
 ///
 impl Metadata {
     /// Parse distribution metadata from metadata bytes
-    pub fn parse(content: &[u8]) -> Result<Self, Error> {
+    pub fn parse_metadata(content: &[u8]) -> Result<Self, MetadataError> {
         // HACK: trick mailparse to parse as UTF-8 instead of ASCII
         let mut mail = b"Content-Type: text/plain; charset=utf-8\n".to_vec();
         mail.extend_from_slice(content);
@@ -153,13 +154,13 @@ impl Metadata {
         };
         let metadata_version = headers
             .get_first_value("Metadata-Version")
-            .ok_or(Error::FieldNotFound("Metadata-Version"))?;
+            .ok_or(MetadataError::FieldNotFound("Metadata-Version"))?;
         let name = headers
             .get_first_value("Name")
-            .ok_or(Error::FieldNotFound("Name"))?;
+            .ok_or(MetadataError::FieldNotFound("Name"))?;
         let version = headers
             .get_first_value("Version")
-            .ok_or(Error::FieldNotFound("Version"))?;
+            .ok_or(MetadataError::FieldNotFound("Version"))?;
         let platforms = get_all_values("Platform");
         let supported_platforms = get_all_values("Supported-Platform");
         let summary = get_first_value("Summary");
