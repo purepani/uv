@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
 use pep508_rs::VerbatimUrl;
+use pypi_types::DirectUrl;
 use uv_normalize::PackageName;
 
 use crate::error::Error;
@@ -114,6 +115,10 @@ impl<T: DistributionMetadata> Verbatim for T {
             self.version_or_url().verbatim()
         ))
     }
+}
+
+pub trait DownloadInfo {
+    pub fn direct_url(&self) -> DirectUrl;
 }
 
 // Implement `Display` for all known types that implement `Metadata`.
