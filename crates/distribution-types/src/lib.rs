@@ -164,8 +164,6 @@ pub enum Dist {
     Source(SourceDist),
 }
 
-fn metadata(dist: &Dist) {}
-
 /// A wheel, with its three possible origins (index, url, path)
 #[derive(Debug, Clone, Hash)]
 #[allow(clippy::large_enum_variant)]
