@@ -1,8 +1,8 @@
 use anyhow::{anyhow, Context, Result};
-use install_wheel_rs::metadata::{find_flat_dist_info, read_dist_info_metadata};
 use std::fs;
 use std::path::{Path, PathBuf};
 use uv_fs::Simplified;
+use uv_metadata::{find_flat_dist_info, read_dist_info_metadata};
 
 use distribution_filename::WheelFilename;
 use pep508_rs::VerbatimUrl;

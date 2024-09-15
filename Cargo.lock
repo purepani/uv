@@ -1039,7 +1039,6 @@ dependencies = [
  "cache-key",
  "distribution-filename",
  "fs-err",
- "install-wheel-rs",
  "itertools 0.13.0",
  "jiff",
  "pep440_rs",
@@ -1058,6 +1057,7 @@ dependencies = [
  "uv-cache-info",
  "uv-fs",
  "uv-git",
+ "uv-metadata",
  "uv-normalize",
 ]
 
@@ -3130,6 +3130,7 @@ dependencies = [
  "uv-fs",
  "uv-git",
  "uv-installer",
+ "uv-metadata",
  "uv-normalize",
  "uv-python",
  "uv-requirements",
