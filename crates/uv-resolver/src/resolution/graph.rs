@@ -13,7 +13,7 @@ use pypi_types::{HashDigest, ParsedUrlError, Requirement, VerbatimParsedUrl, Yan
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use std::fmt::{Display, Formatter};
 use uv_configuration::{Constraints, Overrides};
-use uv_distribution::Metadata;
+use uv_distribution;
 use uv_git::GitResolver;
 use uv_normalize::{ExtraName, GroupName, PackageName};
 
@@ -372,7 +372,14 @@ impl ResolutionGraph {
         preferences: &Preferences,
         index: &InMemoryIndex,
         git: &GitResolver,
-    ) -> Result<(ResolvedDist, Vec<HashDigest>, Option<Metadata>), ResolveError> {
+    ) -> Result<
+        (
+            ResolvedDist,
+            Vec<HashDigest>,
+            Option<uv_distribution::Metadata>,
+        ),
+        ResolveError,
+    > {
         Ok(if let Some(url) = url {
             // Create the distribution.
             let dist = Dist::from_url(name.clone(), url_to_precise(url.clone(), git))?;
