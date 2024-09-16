@@ -282,7 +282,9 @@ pub fn read_flat_wheel_metadata_full(
     let dist_info_prefix = find_flat_dist_info(filename, &wheel)?;
     let metadata = read_dist_info_metadata(&dist_info_prefix, &wheel)?;
     Metadata::parse_metadata(&metadata).map_err(|err| {
-        Error::InvalidMetadata(format!("{dist_info_prefix}.dist-info/METADATA"), Box::new(err))
+        Error::InvalidMetadata(
+            format!("{dist_info_prefix}.dist-info/METADATA"), Box::new(err)
+            )
     })
 }
 

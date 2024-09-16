@@ -1,13 +1,17 @@
+use std::collections::BTreeMap;
+use std::error::Error;
 use std::fmt::Display;
 
 use distribution_types::{
-    BuiltDist, Dist, DistributionMetadata, IndexUrl, Name, ResolvedDist, SourceDist,
-    VersionOrUrlRef,
+    BuiltDist, DirectorySourceDist, Dist, DistributionMetadata, IndexUrl, InstalledDist, Name,
+    ResolvedDist, SourceDist, VersionOrUrlRef,
 };
 use pep440_rs::Version;
 use pep508_rs::MarkerTree;
-use pypi_types::HashDigest;
-use uv_distribution::Metadata;
+use pypi_types::{ArchiveInfo, DirInfo, DirectUrl, HashDigest, VcsInfo, VcsKind};
+use url::Url;
+use uv_distribution;
+use uv_git::GitReference;
 use uv_normalize::{ExtraName, GroupName, PackageName};
 
 pub use crate::resolution::display::{AnnotationStyle, DisplayResolutionGraph};
@@ -30,7 +34,8 @@ pub(crate) struct AnnotatedDist {
     pub(crate) extra: Option<ExtraName>,
     pub(crate) dev: Option<GroupName>,
     pub(crate) hashes: Vec<HashDigest>,
-    pub(crate) metadata: Option<Metadata>,
+    pub(crate) metadata: Option<uv_distribution::Metadata>,
+    pub(crate) metadata_full: Option<pypi_types::Metadata>,
     pub(crate) marker: MarkerTree,
 }
 
@@ -59,6 +64,95 @@ impl AnnotatedDist {
                     SourceDist::Directory(_) => None,
                 },
             },
+        }
+    }
+
+    pub(crate) fn url(&self) -> Result<Url, ()> {
+        match &self.dist {
+            ResolvedDist::Installed(dist) => match dist {
+                InstalledDist::Registry(dist) => Url::from_file_path(&dist.path),
+                InstalledDist::Url(dist) => Ok(dist.url.clone()),
+                InstalledDist::EggInfoFile(dist) => Url::from_file_path(&dist.path),
+                InstalledDist::EggInfoDirectory(dist) => Url::from_file_path(&dist.path),
+                InstalledDist::LegacyEditable(dist) => Ok(dist.target_url.clone()),
+            },
+            ResolvedDist::Installable(dist) => match dist {
+                Dist::Built(dist) => match dist {
+                    BuiltDist::Registry(dist) => Ok(dist.best_wheel().index.url().clone()),
+                    BuiltDist::DirectUrl(dist) => Ok(dist.location.clone()),
+                    BuiltDist::Path(dist) => Url::from_file_path(&dist.install_path),
+                },
+                Dist::Source(dist) => match dist {
+                    SourceDist::Registry(dist) => Ok(dist.index.url().clone()),
+                    SourceDist::DirectUrl(dist) => Ok(dist.location.clone()),
+                    SourceDist::Git(dist) => Ok(dist.git.repository().clone()),
+                    SourceDist::Path(dist) => Url::from_file_path(&dist.install_path),
+                    SourceDist::Directory(dist) => Url::from_file_path(&dist.install_path),
+                },
+            },
+        }
+    }
+
+    pub fn direct_url(&self) -> Option<DirectUrl> {
+        let url = self.url().ok()?.to_string();
+        let mut hashes = BTreeMap::new();
+        for hash in self.hashes.clone() {
+            hashes.insert(hash.algorithm.to_string(), hash.digest.to_string());
+        }
+
+        let subdirectory = match &self.dist {
+            ResolvedDist::Installable(Dist::Source(SourceDist::DirectUrl(dist))) => {
+                dist.subdirectory.clone()
+            }
+            ResolvedDist::Installable(Dist::Source(SourceDist::Git(dist))) => {
+                dist.subdirectory.clone()
+            }
+            _ => None,
+        };
+
+        match &self.dist {
+            ResolvedDist::Installed(InstalledDist::EggInfoFile(_))
+            | ResolvedDist::Installed(InstalledDist::EggInfoDirectory(_))
+            | ResolvedDist::Installed(InstalledDist::LegacyEditable(_))
+            | ResolvedDist::Installable(Dist::Built(BuiltDist::Path(_)))
+            | ResolvedDist::Installable(Dist::Source(SourceDist::Path(_)))
+            | ResolvedDist::Installable(Dist::Source(SourceDist::Directory(_))) => {
+                Some(DirectUrl::LocalDirectory {
+                    url,
+                    dir_info: DirInfo {
+                        editable: Some(self.dist.is_editable().clone()),
+                    },
+                })
+            }
+            ResolvedDist::Installed(InstalledDist::Registry(_))
+            | ResolvedDist::Installed(InstalledDist::Url(_))
+            | ResolvedDist::Installable(Dist::Built(BuiltDist::Registry(_)))
+            | ResolvedDist::Installable(Dist::Built(BuiltDist::DirectUrl(_)))
+            | ResolvedDist::Installable(Dist::Source(SourceDist::Registry(_)))
+            | ResolvedDist::Installable(Dist::Source(SourceDist::DirectUrl(_))) => {
+                Some(DirectUrl::ArchiveUrl {
+                    url,
+                    archive_info: ArchiveInfo {
+                        hash: None,
+                        hashes: Some(hashes),
+                    },
+                    subdirectory,
+                })
+            }
+            ResolvedDist::Installable(Dist::Source(SourceDist::Git(dist))) => {
+                Some(DirectUrl::VcsUrl {
+                    url,
+                    vcs_info: VcsInfo {
+                        vcs: VcsKind::Git,
+                        commit_id: match dist.git.precise() {
+                            Some(git_sha) => Some(git_sha.to_string()),
+                            None => None,
+                        },
+                        requested_revision: Some(dist.git.reference().as_str()?.to_string()),
+                    },
+                    subdirectory,
+                })
+            }
         }
     }
 }

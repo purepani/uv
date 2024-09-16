@@ -117,10 +117,6 @@ impl<T: DistributionMetadata> Verbatim for T {
     }
 }
 
-pub trait DownloadInfo {
-    pub fn direct_url(&self) -> DirectUrl;
-}
-
 // Implement `Display` for all known types that implement `Metadata`.
 impl std::fmt::Display for LocalDist {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
