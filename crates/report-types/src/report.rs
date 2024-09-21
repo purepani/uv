@@ -2,11 +2,13 @@ use distribution_types::{
     BuiltDist, CachedDist, Dist, DistributionMetadata, IndexLocations, InstalledMetadata, Name,
     Resolution, ResolvedDist, VersionOrUrlRef,
 };
+use itertools::Itertools;
 use pep440_rs::Version;
 use pep508_rs::MarkerEnvironment;
 use pypi_types::{DirectUrl, HashDigest, Metadata, ParsedUrl, Requirement, RequirementSource};
 use serde::{Deserialize, Serialize};
 use url::Url;
+use uv_metadata::read_flat_wheel_metadata_full;
 use uv_normalize::{ExtraName, PackageName};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -29,43 +31,50 @@ pub struct InstallationReportItem {
     pub requested_extras: Vec<ExtraName>,
 }
 
+impl InstallationReportItem {
+    pub fn from_cached_dist(
+        dist: &CachedDist,
+        requirements: &[Requirement],
+    ) -> InstallationReportItem {
+        let requirement = requirements
+            .iter()
+            .find(|requirement| requirement.name == *dist.name());
+
+        InstallationReportItem {
+            is_direct: match dist.version_or_url() {
+                VersionOrUrlRef::Url(_) => true,
+                _ => false,
+            },
+            is_yanked: false,
+            download_info: match requirement {
+                Some(req) => None,
+                None => None,
+            },
+            requested: match requirement {
+                Some(req) => true,
+                None => false,
+            },
+            requested_extras: match requirement {
+                Some(req) => req.extras.clone(),
+                None => vec![],
+            },
+            metadata: read_flat_wheel_metadata_full(dist.filename(), dist.path().into_iter())
+                .unwrap(),
+        }
+    }
+}
+
 impl PipReport {
     pub fn from_resolution(
         dists: &[CachedDist],
         requirements: &[Requirement],
         //resolution: Resolution,
     ) -> PipReport {
-        PipReport {
-            install: dists
-                .iter()
-                .map(|dist| {
-                    let requirement = requirements
-                        .iter()
-                        .find(|requirement| requirement.name == *dist.name());
-
-                    return InstallationReportItem {
-                        is_direct: match dist.version_or_url() {
-                            VersionOrUrlRef::Url(_) => true,
-                            _ => false,
-                        },
-                        is_yanked: false,
-                        download_info: match requirement {
-                            Some(req) => None,
-                            None => None,
-                        },
-                        requested: match requirement {
-                            Some(req) => true,
-                            None => false,
-                        },
-                        requested_extras: match requirement {
-                            Some(req) => req.extras.clone(),
-                            None => vec![],
-                        },
-                        metadata: dist.metadata().expect("Failed to Parse"),
-                    };
-                })
-                .collect::<Vec<_>>(),
-        }
+        let install = dists
+            .iter()
+            .map(|dist| InstallationReportItem::from_cached_dist(dist, requirements))
+            .collect();
+        PipReport { install }
     }
 
     pub fn to_json(&self) -> Result<String, serde_json::Error> {

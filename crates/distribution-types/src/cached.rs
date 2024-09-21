@@ -170,19 +170,6 @@ impl CachedDist {
         }
     }
 
-    pub fn metadata(&self) -> Result<pypi_types::Metadata> {
-        let prefix = find_flat_dist_info(self.filename(), self.path());
-        let contents = prefix.and_then(|prefix| read_dist_info_metadata(&prefix, self.path()));
-
-        // TODO(zanieb): Update this to use thiserror so we can unpack parse errors downstream
-        pypi_types::Metadata::parse_metadata(&contents.expect("test")).with_context(|| {
-            format!(
-                "Failed to parse `METADATA` file at: {}",
-                self.path().user_display()
-            )
-        })
-    }
-
     pub fn yanked(&self) -> Option<&Yanked> {
         //match self {
         //Self::Registry(dist) => false,

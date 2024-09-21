@@ -4,7 +4,8 @@
 //! specification](https://packaging.python.org/en/latest/specifications/core-metadata/).
 
 use distribution_filename::WheelFilename;
-use pypi_types::Metadata23;
+use pep440_rs::Version;
+use pypi_types::{Metadata, Metadata23};
 use std::io;
 use std::io::{Read, Seek};
 use std::path::Path;
@@ -271,6 +272,17 @@ pub fn read_flat_wheel_metadata(
             format!("{dist_info_prefix}.dist-info/METADATA"),
             Box::new(err),
         )
+    })
+}
+
+pub fn read_flat_wheel_metadata_full(
+    filename: &WheelFilename,
+    wheel: impl AsRef<Path>,
+) -> Result<Metadata, Error> {
+    let dist_info_prefix = find_flat_dist_info(filename, &wheel)?;
+    let metadata = read_dist_info_metadata(&dist_info_prefix, &wheel)?;
+    Metadata::parse_metadata(&metadata).map_err(|err| {
+        Error::InvalidMetadata(format!("{dist_info_prefix}.dist-info/METADATA"), err)
     })
 }
 
