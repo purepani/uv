@@ -23,15 +23,15 @@ use crate::{LenientVersionSpecifiers, VerbatimParsedUrl};
 /// Taken from <https://github.com/PyO3/python-pkginfo-rs/blob/5609785355afed3ff6c63b14331e729d0f929b8b/src/metadata.rs>
 ///
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub struct Metadata {
     /// Version of the file format; legal values are `1.0`, `1.1`, `1.2`, `2.1` and `2.2`.
     pub metadata_version: String,
     /// The name of the distribution.
-    pub name: String,
+    pub name: PackageName,
     /// A string containing the distribution’s version number.
-    pub version: String,
+    pub version: Version,
     /// A Platform specification describing an operating system supported by the distribution
     /// which is not listed in the “Operating System” Trove classifiers.
     #[cfg_attr(feature = "serde", serde(default))]
@@ -76,7 +76,7 @@ pub struct Metadata {
     pub classifiers: Vec<String>,
     /// Each entry contains a string naming some other distutils project required by this distribution.
     #[cfg_attr(feature = "serde", serde(default))]
-    pub requires_dist: Vec<String>,
+    pub requires_dist: Vec<Requirement<VerbatimParsedUrl>>,
     /// Each entry contains a string naming a Distutils project which is contained within this distribution.
     #[cfg_attr(feature = "serde", serde(default))]
     pub provides_dist: Vec<String>,
@@ -99,7 +99,7 @@ pub struct Metadata {
     pub maintainer_email: Option<String>,
     /// This field specifies the Python version(s) that the distribution is guaranteed to be compatible with.
     #[cfg_attr(feature = "serde", serde(default))]
-    pub requires_python: Option<String>,
+    pub requires_python: Option<VersionSpecifiers>,
     /// Each entry contains a string describing some dependency in the system that the distribution is to be used.
     #[cfg_attr(feature = "serde", serde(default))]
     pub requires_external: Vec<String>,
@@ -109,7 +109,7 @@ pub struct Metadata {
     /// A string containing the name of an optional feature. Must be a valid Python identifier.
     /// May be used to make a dependency conditional on whether the optional feature has been requested.
     #[cfg_attr(feature = "serde", serde(default))]
-    pub provides_extras: Vec<String>,
+    pub provides_extras: Vec<ExtraName>,
     /// A string stating the markup syntax (if any) used in the distribution’s description,
     /// so that tools can intelligently render the description.
     #[cfg_attr(feature = "serde", serde(default))]
@@ -152,15 +152,50 @@ impl Metadata {
                 .collect();
             values
         };
+
         let metadata_version = headers
             .get_first_value("Metadata-Version")
             .ok_or(MetadataError::FieldNotFound("Metadata-Version"))?;
-        let name = headers
-            .get_first_value("Name")
-            .ok_or(MetadataError::FieldNotFound("Name"))?;
-        let version = headers
-            .get_first_value("Version")
-            .ok_or(MetadataError::FieldNotFound("Version"))?;
+        //let name = headers
+        //   .get_first_value("Name")
+        //  .ok_or(MetadataError::FieldNotFound("Name"))?;
+        //let version = headers
+        //.get_first_value("Version")
+        //.ok_or(MetadataError::FieldNotFound("Version"))?;
+        //
+        let name = PackageName::new(
+            headers
+                .get_first_value("Name")
+                .ok_or(MetadataError::FieldNotFound("Name"))?,
+        )?;
+        let version = Version::from_str(
+            &headers
+                .get_first_value("Version")
+                .ok_or(MetadataError::FieldNotFound("Version"))?,
+        )
+        .map_err(MetadataError::Pep440VersionError)?;
+        let requires_dist = headers
+            .get_all_values("Requires-Dist")
+            .into_iter()
+            .map(|requires_dist| LenientRequirement::from_str(&requires_dist))
+            .map_ok(Requirement::from)
+            .collect::<Result<Vec<_>, _>>()?;
+        let requires_python = headers
+            .get_first_value("Requires-Python")
+            .map(|requires_python| LenientVersionSpecifiers::from_str(&requires_python))
+            .transpose()?
+            .map(VersionSpecifiers::from);
+        let provides_extras = headers
+            .get_all_values("Provides-Extra")
+            .into_iter()
+            .filter_map(|provides_extra| match ExtraName::new(provides_extra) {
+                Ok(extra_name) => Some(extra_name),
+                Err(err) => {
+                    warn!("Ignoring invalid extra: {err}");
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
         let platforms = get_all_values("Platform");
         let supported_platforms = get_all_values("Supported-Platform");
         let summary = get_first_value("Summary");
@@ -179,15 +214,15 @@ impl Metadata {
         let license_expression = get_first_value("License-Expression");
         let license_files = get_all_values("License-File");
         let classifiers = get_all_values("Classifier");
-        let requires_dist = get_all_values("Requires-Dist");
+        //let requires_dist = get_all_values("Requires-Dist");
         let provides_dist = get_all_values("Provides-Dist");
         let obsoletes_dist = get_all_values("Obsoletes-Dist");
         let maintainer = get_first_value("Maintainer");
         let maintainer_email = get_first_value("Maintainer-email");
-        let requires_python = get_first_value("Requires-Python");
+        //let requires_python = get_first_value("Requires-Python");
         let requires_external = get_all_values("Requires-External");
         let project_urls = get_all_values("Project-URL");
-        let provides_extras = get_all_values("Provides-Extra");
+        //let provides_extras = get_all_values("Provides-Extra");
         let description_content_type = get_first_value("Description-Content-Type");
         let dynamic = get_all_values("Dynamic");
         Ok(Metadata {
@@ -218,6 +253,218 @@ impl Metadata {
             provides_extras,
             description_content_type,
             dynamic,
+        })
+    }
+
+    /// Read the [`Metadata23`] from a source distribution's `PKG-INFO` file, if it uses Metadata 2.2
+    /// or later _and_ none of the required fields (`Requires-Python`, `Requires-Dist`, and
+    /// `Provides-Extra`) are marked as dynamic.
+    pub fn parse_pkg_info(content: &[u8]) -> Result<Self, MetadataError> {
+        let headers = Headers::parse(content)?;
+
+        // To rely on a source distribution's `PKG-INFO` file, the `Metadata-Version` field must be
+        // present and set to a value of at least `2.2`.
+        let metadata_version = headers
+            .get_first_value("Metadata-Version")
+            .ok_or(MetadataError::FieldNotFound("Metadata-Version"))?;
+
+        // If any of the fields we need are marked as dynamic, we can't use the `PKG-INFO` file.
+        let dynamic = headers.get_all_values("Dynamic").collect::<Vec<_>>();
+        for field in dynamic {
+            match field.as_str() {
+                "Requires-Python" => return Err(MetadataError::DynamicField("Requires-Python")),
+                "Requires-Dist" => return Err(MetadataError::DynamicField("Requires-Dist")),
+                "Provides-Extra" => return Err(MetadataError::DynamicField("Provides-Extra")),
+                _ => (),
+            }
+        }
+
+        // The `Name` and `Version` fields are required, and can't be dynamic.
+        let name = PackageName::new(
+            headers
+                .get_first_value("Name")
+                .ok_or(MetadataError::FieldNotFound("Name"))?,
+        )?;
+        let version = Version::from_str(
+            &headers
+                .get_first_value("Version")
+                .ok_or(MetadataError::FieldNotFound("Version"))?,
+        )
+        .map_err(MetadataError::Pep440VersionError)?;
+
+        // The remaining fields are required to be present.
+        let requires_dist = headers
+            .get_all_values("Requires-Dist")
+            .map(|requires_dist| LenientRequirement::from_str(&requires_dist))
+            .map_ok(Requirement::from)
+            .collect::<Result<Vec<_>, _>>()?;
+        let requires_python = headers
+            .get_first_value("Requires-Python")
+            .map(|requires_python| LenientVersionSpecifiers::from_str(&requires_python))
+            .transpose()?
+            .map(VersionSpecifiers::from);
+        let provides_extras = headers
+            .get_all_values("Provides-Extra")
+            .filter_map(|provides_extra| match ExtraName::new(provides_extra) {
+                Ok(extra_name) => Some(extra_name),
+                Err(err) => {
+                    warn!("Ignoring invalid extra: {err}");
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let platforms = headers.get_all_values("Platform").collect();
+        let supported_platforms = headers.get_all_values("Supported-Platform").collect();
+        let summary = headers.get_first_value("Summary");
+        let description = headers.get_first_value("Description");
+        let keywords = headers.get_first_value("Keywords");
+        let home_page = headers.get_first_value("Home-Page");
+        let download_url = headers.get_first_value("Download-URL");
+        let author = headers.get_first_value("Author");
+        let author_email = headers.get_first_value("Author-email");
+        let license = headers.get_first_value("License");
+        let license_expression = headers.get_first_value("License-Expression");
+        let license_files = headers.get_all_values("License-File").collect();
+        let classifiers = headers.get_all_values("Classifier").collect();
+        //let requires_dist = get_all_values("Requires-Dist");
+        let provides_dist = headers.get_all_values("Provides-Dist").collect();
+        let obsoletes_dist = headers.get_all_values("Obsoletes-Dist").collect();
+        let maintainer = headers.get_first_value("Maintainer");
+        let maintainer_email = headers.get_first_value("Maintainer-email");
+        //let requires_python = get_first_value("Requires-Python");
+        let requires_external = headers.get_all_values("Requires-External").collect();
+        let project_urls = headers.get_all_values("Project-URL").collect();
+        //let provides_extras = get_all_values("Provides-Extra");
+        let description_content_type = headers.get_first_value("Description-Content-Type");
+        let dynamic = headers.get_all_values("Dynamic").collect();
+
+        Ok(Metadata {
+            metadata_version,
+            name,
+            version,
+            platforms,
+            supported_platforms,
+            summary,
+            description,
+            keywords,
+            home_page,
+            download_url,
+            author,
+            author_email,
+            license,
+            license_expression,
+            license_files,
+            classifiers,
+            requires_dist,
+            provides_dist,
+            obsoletes_dist,
+            maintainer,
+            maintainer_email,
+            requires_python,
+            requires_external,
+            project_urls,
+            provides_extras,
+            description_content_type,
+            dynamic,
+        })
+    }
+
+    /// Extract the metadata from a `pyproject.toml` file, as specified in PEP 621.
+    pub fn parse_pyproject_toml(contents: &str) -> Result<Self, MetadataError> {
+        let pyproject_toml = PyProjectToml::from_toml(contents)?;
+
+        let project = pyproject_toml
+            .project
+            .ok_or(MetadataError::FieldNotFound("project"))?;
+
+        // If any of the fields we need were declared as dynamic, we can't use the `pyproject.toml` file.
+        let dynamic = project.dynamic.unwrap_or_default();
+        for field in dynamic {
+            match field.as_str() {
+                "dependencies" => return Err(MetadataError::DynamicField("dependencies")),
+                "optional-dependencies" => {
+                    return Err(MetadataError::DynamicField("optional-dependencies"))
+                }
+                "requires-python" => return Err(MetadataError::DynamicField("requires-python")),
+                "version" => return Err(MetadataError::DynamicField("version")),
+                _ => (),
+            }
+        }
+
+        // If dependencies are declared with Poetry, and `project.dependencies` is omitted, treat
+        // the dependencies as dynamic. The inclusion of a `project` table without defining
+        // `project.dependencies` is almost certainly an error.
+        if project.dependencies.is_none()
+            && pyproject_toml.tool.and_then(|tool| tool.poetry).is_some()
+        {
+            return Err(MetadataError::PoetrySyntax);
+        }
+
+        let name = project.name;
+        let version = project
+            .version
+            .ok_or(MetadataError::FieldNotFound("version"))?;
+
+        // Parse the Python version requirements.
+        let requires_python = project
+            .requires_python
+            .map(|requires_python| {
+                LenientVersionSpecifiers::from_str(&requires_python).map(VersionSpecifiers::from)
+            })
+            .transpose()?;
+
+        // Extract the requirements.
+        let mut requires_dist = project
+            .dependencies
+            .unwrap_or_default()
+            .into_iter()
+            .map(|requires_dist| LenientRequirement::from_str(&requires_dist))
+            .map_ok(Requirement::from)
+            .collect::<Result<Vec<_>, _>>()?;
+
+        // Extract the optional dependencies.
+        let mut provides_extras: Vec<ExtraName> = Vec::new();
+        for (extra, requirements) in project.optional_dependencies.unwrap_or_default() {
+            requires_dist.extend(
+                requirements
+                    .into_iter()
+                    .map(|requires_dist| LenientRequirement::from_str(&requires_dist))
+                    .map_ok(Requirement::from)
+                    .map_ok(|requirement| requirement.with_extra_marker(&extra))
+                    .collect::<Result<Vec<_>, _>>()?,
+            );
+            provides_extras.push(extra);
+        }
+
+        Ok(Self {
+            metadata_version: String::from("2.3"),
+            name,
+            version,
+            platforms: vec![],
+            supported_platforms: vec![],
+            summary: None,
+            description: None,
+            keywords: None,
+            home_page: None,
+            download_url: None,
+            author: None,
+            author_email: None,
+            license: None,
+            license_expression: None,
+            license_files: vec![],
+            classifiers: vec![],
+            requires_dist,
+            provides_dist: vec![],
+            obsoletes_dist: vec![],
+            maintainer: None,
+            maintainer_email: None,
+            requires_python,
+            requires_external: vec![],
+            project_urls: vec![],
+            provides_extras,
+            description_content_type: None,
+            dynamic: vec![],
         })
     }
 }
@@ -476,6 +723,18 @@ impl Metadata23 {
             requires_python,
             provides_extras,
         })
+    }
+}
+
+impl From<Metadata> for Metadata23 {
+    fn from(metadata: Metadata) -> Metadata23 {
+        Metadata23 {
+            name: metadata.name,
+            version: metadata.version,
+            requires_dist: metadata.requires_dist,
+            requires_python: metadata.requires_python,
+            provides_extras: metadata.provides_extras,
+        }
     }
 }
 

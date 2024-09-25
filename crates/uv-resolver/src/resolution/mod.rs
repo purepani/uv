@@ -35,7 +35,6 @@ pub(crate) struct AnnotatedDist {
     pub(crate) dev: Option<GroupName>,
     pub(crate) hashes: Vec<HashDigest>,
     pub(crate) metadata: Option<uv_distribution::Metadata>,
-    pub(crate) metadata_full: Option<pypi_types::Metadata>,
     pub(crate) marker: MarkerTree,
 }
 
