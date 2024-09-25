@@ -486,6 +486,7 @@ pub struct Metadata23 {
     pub requires_dist: Vec<Requirement<VerbatimParsedUrl>>,
     pub requires_python: Option<VersionSpecifiers>,
     pub provides_extras: Vec<ExtraName>,
+    pub original_metadata: Option<Metadata>,
 }
 
 /// <https://github.com/PyO3/python-pkginfo-rs/blob/d719988323a0cfea86d4737116d7917f30e819e2/src/error.rs>
@@ -533,6 +534,7 @@ impl From<Pep508Error<VerbatimParsedUrl>> for MetadataError {
 impl Metadata23 {
     /// Parse the [`Metadata23`] from a `METADATA` file, as included in a built distribution (wheel).
     pub fn parse_metadata(content: &[u8]) -> Result<Self, MetadataError> {
+        let original_metadata = Metadata::parse_metadata(content).ok();
         let headers = Headers::parse(content)?;
 
         let name = PackageName::new(
@@ -573,6 +575,7 @@ impl Metadata23 {
             requires_dist,
             requires_python,
             provides_extras,
+            original_metadata,
         })
     }
 
@@ -580,6 +583,7 @@ impl Metadata23 {
     /// or later _and_ none of the required fields (`Requires-Python`, `Requires-Dist`, and
     /// `Provides-Extra`) are marked as dynamic.
     pub fn parse_pkg_info(content: &[u8]) -> Result<Self, MetadataError> {
+        let original_metadata = Metadata::parse_pkg_info(content).ok();
         let headers = Headers::parse(content)?;
 
         // To rely on a source distribution's `PKG-INFO` file, the `Metadata-Version` field must be
@@ -646,6 +650,7 @@ impl Metadata23 {
             requires_dist,
             requires_python,
             provides_extras,
+            original_metadata,
         })
     }
 
@@ -722,6 +727,7 @@ impl Metadata23 {
             requires_dist,
             requires_python,
             provides_extras,
+            original_metadata: None,
         })
     }
 }
@@ -729,11 +735,12 @@ impl Metadata23 {
 impl From<Metadata> for Metadata23 {
     fn from(metadata: Metadata) -> Metadata23 {
         Metadata23 {
-            name: metadata.name,
-            version: metadata.version,
-            requires_dist: metadata.requires_dist,
-            requires_python: metadata.requires_python,
-            provides_extras: metadata.provides_extras,
+            name: metadata.name.clone(),
+            version: metadata.version.clone(),
+            requires_dist: metadata.requires_dist.clone(),
+            requires_python: metadata.requires_python.clone(),
+            provides_extras: metadata.provides_extras.clone(),
+            original_metadata: Some(metadata.clone()),
         }
     }
 }

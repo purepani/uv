@@ -34,6 +34,7 @@ pub struct Metadata {
     pub requires_python: Option<VersionSpecifiers>,
     pub provides_extras: Vec<ExtraName>,
     pub dev_dependencies: BTreeMap<GroupName, Vec<pypi_types::Requirement>>,
+    pub original_metadata: Option<pypi_types::Metadata>,
 }
 
 impl Metadata {
@@ -51,6 +52,7 @@ impl Metadata {
             requires_python: metadata.requires_python,
             provides_extras: metadata.provides_extras,
             dev_dependencies: BTreeMap::default(),
+            original_metadata: metadata.original_metadata,
         }
     }
 
@@ -86,6 +88,7 @@ impl Metadata {
             requires_python: metadata.requires_python,
             provides_extras,
             dev_dependencies,
+            original_metadata: metadata.original_metadata,
         })
     }
 }

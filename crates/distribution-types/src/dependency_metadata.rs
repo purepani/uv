@@ -35,6 +35,7 @@ impl DependencyMetadata {
             requires_dist: metadata.requires_dist.clone(),
             requires_python: metadata.requires_python.clone(),
             provides_extras: metadata.provides_extras.clone(),
+            original_metadata: None,
         })
     }
 

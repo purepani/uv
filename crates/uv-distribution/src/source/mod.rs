@@ -2054,6 +2054,7 @@ async fn read_egg_info(
         requires_python: metadata.requires_python,
         requires_dist: requires_txt.requires_dist,
         provides_extras: requires_txt.provides_extras,
+        original_metadata: pypi_types::Metadata::parse_pkg_info(&content).ok(),
     })
 }
 
