@@ -1,6 +1,6 @@
 use distribution_filename::DistExtension;
 use pep508_rs::MarkerTree;
-use pypi_types::{HashDigest, Requirement, RequirementSource};
+use pypi_types::{HashDigest, Metadata, Requirement, RequirementSource};
 use std::collections::BTreeMap;
 use uv_normalize::{ExtraName, GroupName, PackageName};
 
@@ -11,6 +11,7 @@ use crate::{BuiltDist, Diagnostic, Dist, Name, ResolvedDist, SourceDist};
 pub struct Resolution {
     packages: BTreeMap<PackageName, ResolvedDist>,
     hashes: BTreeMap<PackageName, Vec<HashDigest>>,
+    metadata: BTreeMap<PackageName, Option<Metadata>>,
     diagnostics: Vec<ResolutionDiagnostic>,
 }
 
@@ -19,11 +20,13 @@ impl Resolution {
     pub fn new(
         packages: BTreeMap<PackageName, ResolvedDist>,
         hashes: BTreeMap<PackageName, Vec<HashDigest>>,
+        metadata: BTreeMap<PackageName, Option<Metadata>>,
         diagnostics: Vec<ResolutionDiagnostic>,
     ) -> Self {
         Self {
             packages,
             hashes,
+            metadata,
             diagnostics,
         }
     }
@@ -84,10 +87,16 @@ impl Resolution {
             .into_iter()
             .filter(|(name, _)| packages.contains_key(name))
             .collect();
+        let metadata = self
+            .metadata
+            .into_iter()
+            .filter(|(name, _)| packages.contains_key(name))
+            .collect();
         let diagnostics = self.diagnostics.clone();
         Self {
             packages,
             hashes,
+            metadata,
             diagnostics,
         }
     }
@@ -105,10 +114,17 @@ impl Resolution {
             .into_iter()
             .filter(|(name, _)| packages.contains_key(name))
             .collect();
+
+        let metadata = self
+            .metadata
+            .into_iter()
+            .filter(|(name, _)| packages.contains_key(name))
+            .collect();
         let diagnostics = self.diagnostics.clone();
         Self {
             packages,
             hashes,
+            metadata,
             diagnostics,
         }
     }

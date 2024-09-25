@@ -624,6 +624,7 @@ impl Lock {
 
         let mut map = BTreeMap::default();
         let mut hashes = BTreeMap::default();
+        let mut metadata = BTreeMap::default();
         while let Some((dist, extra)) = queue.pop_front() {
             let deps = if let Some(extra) = extra {
                 Either::Left(dist.optional_dependencies.get(extra).into_iter().flatten())
@@ -660,7 +661,7 @@ impl Lock {
             }
         }
         let diagnostics = vec![];
-        Ok(Resolution::new(map, hashes, diagnostics))
+        Ok(Resolution::new(map, hashes, metadata, diagnostics))
     }
 
     /// Returns the TOML representation of this lockfile.

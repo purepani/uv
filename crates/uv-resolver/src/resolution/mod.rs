@@ -154,6 +154,9 @@ impl AnnotatedDist {
             }
         }
     }
+    pub fn metadata(&self) -> Option<pypi_types::Metadata> {
+        self.metadata.clone()?.original_metadata
+    }
 }
 
 impl Name for AnnotatedDist {

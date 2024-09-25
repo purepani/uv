@@ -33,7 +33,7 @@ pub struct InstallationReportItem {
 
 impl InstallationReportItem {
     pub fn from_cached_dist(
-        dist: &CachedDist,
+        dist: ResolvedDist,
         requirements: &[Requirement],
     ) -> InstallationReportItem {
         let requirement = requirements
@@ -66,10 +66,12 @@ impl InstallationReportItem {
 
 impl PipReport {
     pub fn from_resolution(
+        resolution: Resolution,
         dists: &[CachedDist],
         requirements: &[Requirement],
         //resolution: Resolution,
     ) -> PipReport {
+        resolution.requirements()
         let install = dists
             .iter()
             .map(|dist| InstallationReportItem::from_cached_dist(dist, requirements))

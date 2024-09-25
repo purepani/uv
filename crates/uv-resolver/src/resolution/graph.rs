@@ -3,6 +3,7 @@ use distribution_types::{
     VersionOrUrlRef,
 };
 use indexmap::IndexSet;
+use itertools::Itertools;
 use pep440_rs::{Version, VersionSpecifier};
 use pep508_rs::{MarkerEnvironment, MarkerTree, MarkerTreeKind, VerbatimUrl};
 use petgraph::{
@@ -692,6 +693,11 @@ impl ResolutionGraph {
 
 impl From<ResolutionGraph> for distribution_types::Resolution {
     fn from(graph: ResolutionGraph) -> Self {
+        let metadata = graph
+            .dists()
+            .into_iter()
+            .map(|node| (node.name().clone(), node.metadata().clone()))
+            .collect();
         Self::new(
             graph
                 .dists()
@@ -701,6 +707,7 @@ impl From<ResolutionGraph> for distribution_types::Resolution {
                 .dists()
                 .map(|node| (node.name().clone(), node.hashes.clone()))
                 .collect(),
+            metadata,
             graph.diagnostics,
         )
     }
